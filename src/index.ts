@@ -1,6 +1,6 @@
-import { connect, Mongoose } from 'mongoose';
+import { connect, Mongoose, Document } from 'mongoose';
 
-import {defineModel, loadModels} from './models';
+import {defineModel, loadModels, IModel} from './models';
 
 import * as utils from './utils';
 
@@ -16,6 +16,8 @@ export interface IDataWrapperOptions {
 export interface IDataWrapperConnectOptions {
     modelsDirPath: string;
 }
+
+export type DocumentProperties<P> = {} & P & Document;
 
 const _transform = (doc, ret) => {
 
@@ -79,4 +81,4 @@ export class DataWrapper<T> {
 }
 
 export * from "./utils";
-export {defineModel};
+export {defineModel, IModel};
