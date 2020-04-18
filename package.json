@@ -1,0 +1,25 @@
+{
+  "name": "@super-js/datawrapper",
+  "version": "0.0.1",
+  "license": "MIT",
+  "private": true,
+  "files": ["src"],
+  "dependencies": {
+    "mongoose": "^5.9.9"
+  },
+  "devDependencies": {
+    "@types/jest": "^25.2.1",
+    "@types/mongoose": "^5.7.11",
+    "@types/node": "^13.11.1",
+    "jest": "^25.3.0",
+    "prettier": "^2.0.4",
+    "pretty-quick": "^2.0.1",
+    "rimraf": "^3.0.2",
+    "ts-jest": "^25.4.0",
+    "typescript": "^3.8.3"
+  },
+  "scripts": {
+    "test": "yarn jest",
+    "build": "yarn rimraf lib/**/* && tsc -p tsconfig.json"
+  }
+}
