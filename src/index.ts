@@ -82,3 +82,4 @@ export class DataWrapper<T> {
 
 export * from "./utils";
 export {defineModel, IModel};
+export * as Types from "./types";

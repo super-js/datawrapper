@@ -8,6 +8,8 @@ import {
     HookAsyncCallback
 } from "mongoose";
 
+import {Virtual} from "../types";
+
 export type ModelDefiner = <M extends Document>(name: string, mongooseConnection: Connection) => Model<M>;
 
 export interface IStaticMethods {
@@ -16,8 +18,6 @@ export interface IStaticMethods {
 
 type TAttributes<P>  = { [name in keyof Partial<P>]: any }
 type TDocumentMethods<D> = { [name in keyof Partial<D>]: Function }
-
-export const Virtual = "VIRTUAL";
 
 export interface IModelDefinition<D, P> {
     attributes?: TAttributes<P>;
