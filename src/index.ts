@@ -1,6 +1,7 @@
-import { connect, Mongoose, Document } from 'mongoose';
+import { connect, Mongoose, Schema, Document } from 'mongoose';
 
-import {defineModel, loadModels, IModel} from './models';
+import {loadModels, IModel} from './models';
+import {defineSchema, SchemaAttributesCallback, ISchemaDefinition} from './schemas';
 
 import * as utils from './utils';
 
@@ -14,21 +15,12 @@ export interface IDataWrapperOptions {
 }
 
 export interface IDataWrapperConnectOptions {
-    modelsDirPath: string;
+    schemasDirPath: string;
 }
 
-export type DocumentProperties<P> = {} & P & Document;
-
 const _transform = (doc, ret) => {
-
-    if(doc._id) {
-        ret.id = doc._id;
-        delete ret._id;
-    }
-
-    delete ret.createdAt;
-    delete ret.updatedAt;
-
+    if(!ret.id) delete ret.id;
+    delete ret._id;
     return ret;
 };
 
@@ -61,7 +53,7 @@ export class DataWrapper<T> {
         this._mongooseInstance.set('toObject', {versionKey: false, transform: _transform, virtuals: true});
         this._mongooseInstance.set('toJSON', {versionKey: false, transform: _transform, virtuals: true});
 
-        this.models = await loadModels<T>(this._mongooseInstance.connection, connectOptions.modelsDirPath);
+        this.models = await loadModels<T>(this._mongooseInstance.connection, connectOptions.schemasDirPath);
 
         return this;
     }
@@ -80,6 +72,7 @@ export class DataWrapper<T> {
 
 }
 
+export {defineSchema, IModel, Schema, Document, SchemaAttributesCallback, ISchemaDefinition};
 export * from "./utils";
-export {defineModel, IModel};
 export * as Types from "./types";
+export {DocumentProperties, DataWrapperDocument} from './documents';
