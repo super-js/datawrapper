@@ -40,7 +40,8 @@ export abstract class DataWrapper<E = any, C = IDataWrapperDatabaseConnections> 
         this.connections[connectionName] = await createConnection({
             ...databaseConnectionOptions,
             name: connectionName,
-            logging: true,
+            logging: false,
+            logger: "advanced-console",
             entities: entityNameSpacesToRegisters
                 .flatMap(this.getEntitiesAsArray.bind(this)) as Function[]
         });
@@ -72,3 +73,5 @@ export abstract class DataWrapper<E = any, C = IDataWrapperDatabaseConnections> 
 }
 
 export * from "typeorm";
+export * from "./entity";
+export * from "class-transformer";
