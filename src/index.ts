@@ -1,78 +1,74 @@
-import { connect, Mongoose, Schema, Document } from 'mongoose';
+import {ConnectionOptions} from "typeorm/connection/ConnectionOptions";
 
-import {loadModels, IModel} from './models';
-import {defineSchema, SchemaAttributesCallback, ISchemaDefinition} from './schemas';
+import {createConnection, Connection} from "typeorm";
 
-import * as utils from './utils';
+export type DataWrapperConnectionOptions<E> = {
+    entityNameSpacesToRegisters: (keyof E & string)[];
+} & ConnectionOptions;
 
-export interface IDataWrapperOptions {
-    host: string;
-    port: number;
-    db: string;
-    user?: string;
-    password?: string;
-    debug?: boolean;
+export interface IDataWrapperBuildOptions<E, C> {
+    connections: {[Name in keyof C]: DataWrapperConnectionOptions<E>}
 }
 
-export interface IDataWrapperConnectOptions {
-    schemasDirPath: string;
+export interface IDataWrapperDatabaseConnections {
+    [connectionName: string]: Connection;
 }
 
-const _transform = (doc, ret) => {
-    if(!ret.id) delete ret.id;
-    delete ret._id;
-    return ret;
-};
+export abstract class DataWrapper<E = any, C = IDataWrapperDatabaseConnections> {
 
-export class DataWrapper<T> {
-    _connectionOptions: IDataWrapperOptions = {} as IDataWrapperOptions;
-    _mongooseInstance: Mongoose;
+    abstract entities: E;
+    connections: C = {} as C;
 
-    models: T = {} as T;
-    utils = utils;
+    public static async build<E, C, T extends DataWrapper<E, C> = DataWrapper<E,C>>(this: new () => T, options: IDataWrapperBuildOptions<E, C>): Promise<T> {
 
-    constructor(dataWrapperOptions: IDataWrapperOptions) {
+        const self = new this();
 
-        const {...connectionOptions} = dataWrapperOptions;
+        const {connections} = options;
 
-        this._connectionOptions = connectionOptions;
-    }
-
-    async connect(connectOptions: IDataWrapperConnectOptions): Promise<DataWrapper<T>> {
-        const { host, port, db, debug, ...mongoConnectionOptions } = this._connectionOptions;
-
-        this._mongooseInstance = await connect(`mongodb://${host}:${port}/${db}`, {
-            ...mongoConnectionOptions,
-            useNewUrlParser: true,
-            useUnifiedTopology: true,
-            useCreateIndex: true,
-            //TBD SSL for production
-        });
-
-        if(debug) this._mongooseInstance.set('debug', true);
-        this._mongooseInstance.set('toObject', {versionKey: false, transform: _transform, virtuals: true});
-        this._mongooseInstance.set('toJSON', {versionKey: false, transform: _transform, virtuals: true});
-
-        this.models = await loadModels<T>(this._mongooseInstance.connection, connectOptions.schemasDirPath);
-
-        return this;
-    }
-
-    async disconnect(): Promise<DataWrapper<T>> {
-        if(this._mongooseInstance) {
-            await this._mongooseInstance.disconnect();
+        for(let connectionName in connections) {
+            await self.addDatabaseConnection(connectionName, connections[connectionName]);
         }
 
-        return this;
+        return self;
     }
 
-    isConnected(): boolean {
-        return this._mongooseInstance && this._mongooseInstance.connection.readyState === 1;
+    async addDatabaseConnection(connectionName: string, connectionOptions: DataWrapperConnectionOptions<E>) {
+        const {
+            entityNameSpacesToRegisters = [], ...databaseConnectionOptions
+        } = connectionOptions;
+
+        this.connections[connectionName] = await createConnection({
+            ...databaseConnectionOptions,
+            name: connectionName,
+            logging: true,
+            entities: entityNameSpacesToRegisters
+                .flatMap(this.getEntitiesAsArray.bind(this)) as Function[]
+        });
+
+        entityNameSpacesToRegisters
+            .forEach(entityNamespace =>
+                this.setConnectionToEntityNamespace(entityNamespace, this.connections[connectionName])
+            )
+    }
+
+    setConnectionToEntityNamespace(entityNamespace: string, connection: Connection): void {
+        if(!this.entities.hasOwnProperty(entityNamespace)) return;
+
+        Object
+            .keys(this.entities[entityNamespace])
+            .forEach(entityName => {
+                this.entities[entityNamespace][entityName].useConnection(connection)
+            });
+    }
+
+    getEntitiesAsArray(entityNamespace: string): Function[] {
+        if(!this.entities.hasOwnProperty(entityNamespace)) return [];
+
+        return Object
+            .keys(this.entities[entityNamespace])
+            .map(entityName => this.entities[entityNamespace][entityName])
     }
 
 }
 
-export {defineSchema, IModel, Schema, Document, SchemaAttributesCallback, ISchemaDefinition};
-export * from "./utils";
-export * as Types from "./types";
-export {DocumentProperties, DataWrapperDocument} from './documents';
+export * from "typeorm";
