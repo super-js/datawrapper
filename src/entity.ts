@@ -5,11 +5,13 @@ import {
     UpdateDateColumn,
     DeleteDateColumn,
     Column,
-    BeforeInsert,
-    ObjectType
+    BeforeInsert, BeforeUpdate, SaveOptions
 } from "typeorm";
 import {classToPlain, Expose} from "class-transformer";
+import { MaxLength, validateOrReject } from "class-validator";
 import { v4 as uuidv4 } from 'uuid';
+import {UniqueColumn} from "./decorators";
+import {DataWrapperValidationError} from "./errors";
 
 export interface IToJSONOptions {
     withDetails?: boolean;
@@ -17,10 +19,14 @@ export interface IToJSONOptions {
 
 export abstract class BaseDataWrapperEntity extends BaseEntity {
 
-    @CreateDateColumn()
+    @CreateDateColumn({
+        type: 'timestamptz'
+    })
     @Expose({ groups: ['withDetails'] })
     createdAt: Date;
-    @UpdateDateColumn()
+    @UpdateDateColumn({
+        type: 'timestamptz'
+    })
     @Expose({ groups: ['withDetails']})
     updatedAt?: Date;
     @Column()
@@ -32,7 +38,7 @@ export abstract class BaseDataWrapperEntity extends BaseEntity {
     @Column({nullable: true})
     @Expose({ groups: ['withDetails'] })
     deletedBy?: string;
-    @DeleteDateColumn({nullable: true})
+    @DeleteDateColumn({nullable: true, type: 'timestamptz'})
     @Expose({ groups: ['withDetails'] })
     deletedAt?: Date;
 
@@ -40,6 +46,40 @@ export abstract class BaseDataWrapperEntity extends BaseEntity {
     _setInternalDates() {
         this.updatedAt = this.createdAt;
         this.changedBy = this.createdBy;
+    }
+
+    @BeforeInsert()
+    _runValidatorBeforeInsert() {
+        return this._runValidator();
+    }
+
+    @BeforeUpdate()
+    _runValidatorBeforeUpdatet() {
+        return this._runValidator();
+    }
+
+    async _runValidator() {
+        try {
+            await validateOrReject(this);
+        } catch(validationErrors) {
+            throw new DataWrapperValidationError({
+                entityName: this.constructor.name,
+                validationErrors
+            });
+        }
+    }
+
+    async save(options?: SaveOptions) {
+        try {
+            await super.save(options);
+            return this;
+        } catch(err) {
+            throw new DataWrapperValidationError({
+                entityName: this.constructor.name,
+                failedDatabaseQuery: err
+            })
+        }
+
     }
 
     toJSON(options? : IToJSONOptions) {
@@ -62,8 +102,8 @@ export abstract class DataWrapperEntity extends BaseDataWrapperEntity {
 
 export abstract class DataWrapperEntityWithCode extends DataWrapperEntity {
 
-    @Column({
-        unique: true
+    @UniqueColumn({
+        length: 36
     })
     code?: string;
 
@@ -71,5 +111,15 @@ export abstract class DataWrapperEntityWithCode extends DataWrapperEntity {
     _setCode() {
         if(!this.code) this.code = uuidv4();
     }
+
+}
+
+export abstract class DataWrapperEntityWithCodeNameDesc extends DataWrapperEntityWithCode {
+
+    @UniqueColumn()
+    name: string;
+
+    @Column({nullable: true})
+    description: string;
 
 }

@@ -73,5 +73,9 @@ export abstract class DataWrapper<E = any, C = IDataWrapperDatabaseConnections> 
 }
 
 export * from "typeorm";
-export * from "./entity";
 export * from "class-transformer";
+export * as Validator from "class-validator";
+
+export * from "./entity";
+export * from "./decorators";
+export * from "./errors";
