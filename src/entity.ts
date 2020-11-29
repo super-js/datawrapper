@@ -5,16 +5,22 @@ import {
     UpdateDateColumn,
     DeleteDateColumn,
     Column,
-    BeforeInsert, BeforeUpdate, SaveOptions
+    BeforeInsert, BeforeUpdate, SaveOptions, QueryRunner
 } from "typeorm";
 import {classToPlain, Expose} from "class-transformer";
 import { MaxLength, validateOrReject } from "class-validator";
 import { v4 as uuidv4 } from 'uuid';
 import {UniqueColumn} from "./decorators";
 import {DataWrapperValidationError} from "./errors";
+import {ObjectType} from "typeorm/common/ObjectType";
+import {DeepPartial} from "typeorm/common/DeepPartial";
 
 export interface IToJSONOptions {
     withDetails?: boolean;
+}
+
+export interface ISaveOptions extends Omit<SaveOptions, 'transaction'> {
+    transaction: QueryRunner;
 }
 
 export abstract class BaseDataWrapperEntity extends BaseEntity {
@@ -58,6 +64,14 @@ export abstract class BaseDataWrapperEntity extends BaseEntity {
         return this._runValidator();
     }
 
+    static createAndSave<T extends BaseDataWrapperEntity>(this: ObjectType<T>, entity: DeepPartial<T>, saveOptions?: ISaveOptions): Promise<T> {
+
+        const {transaction, ..._saveOptions} = saveOptions || {};
+
+        const newInstance = super.create(entity);
+        return transaction ? transaction.manager.save(newInstance) : newInstance.save(_saveOptions) as any;
+    }
+
     async _runValidator() {
         try {
             await validateOrReject(this);
@@ -79,8 +93,8 @@ export abstract class BaseDataWrapperEntity extends BaseEntity {
                 failedDatabaseQuery: err
             })
         }
-
     }
+
 
     toJSON(options? : IToJSONOptions) {
 

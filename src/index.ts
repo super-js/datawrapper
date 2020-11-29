@@ -1,6 +1,6 @@
 import {ConnectionOptions} from "typeorm/connection/ConnectionOptions";
 
-import {createConnection, Connection} from "typeorm";
+import {createConnection, Connection, QueryRunner} from "typeorm";
 
 export type DataWrapperConnectionOptions<E> = {
     entityNameSpacesToRegisters: (keyof E & string)[];
@@ -40,7 +40,6 @@ export abstract class DataWrapper<E = any, C = IDataWrapperDatabaseConnections> 
         this.connections[connectionName] = await createConnection({
             ...databaseConnectionOptions,
             name: connectionName,
-            logging: false,
             logger: "advanced-console",
             entities: entityNameSpacesToRegisters
                 .flatMap(this.getEntitiesAsArray.bind(this)) as Function[]
@@ -68,6 +67,16 @@ export abstract class DataWrapper<E = any, C = IDataWrapperDatabaseConnections> 
         return Object
             .keys(this.entities[entityNamespace])
             .map(entityName => this.entities[entityNamespace][entityName])
+    }
+
+    async startTransaction(connectionName: string): Promise<any> {
+        const queryRunner  = await this.connections[connectionName].createQueryRunner();
+        await queryRunner.startTransaction();
+
+        return {
+            commit: queryRunner.commitTransaction,
+            rollback: queryRunner.rollbackTransaction
+        }
     }
 
 }

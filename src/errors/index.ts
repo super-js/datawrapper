@@ -8,15 +8,14 @@ export interface IDataWrapperValidationErrorConstructor {
     failedDatabaseQuery?: QueryFailedError;
 }
 
-export interface IDataWrapperValidationError {
-    propertyName: string;
-    errors: string[];
+export interface IDataWrapperValidationErrors {
+    [propertyName: string] :  string[];
 }
 
 export class DataWrapperValidationError extends Error {
 
     entityName: string = "";
-    validationErrors: IDataWrapperValidationError[] = [];
+    validationErrors: IDataWrapperValidationErrors = {};
 
     constructor(options: IDataWrapperValidationErrorConstructor) {
         super("Validation Error");
@@ -26,24 +25,26 @@ export class DataWrapperValidationError extends Error {
         this.entityName = entityName;
 
         if(Array.isArray(validationErrors)) {
-            this.validationErrors.push(
-                ...validationErrors.map(validationError => ({
-                    propertyName: validationError.property,
-                    errors: Object
+
+            validationErrors.forEach(validationError => {
+                this.validationErrors[validationError.property] =
+                    Object
                         .keys(validationError.constraints)
                         .map(constraintName => validationError.constraints[constraintName])
-                }))
-            )
-        }
-
-        if(failedDatabaseQuery) {
-            this.validationErrors.push({
-                propertyName: 'TODO',
-                errors: [
-                    ERROR_CODES[(failedDatabaseQuery as any).code] || 'Invalid value'
-                ]
             })
         }
 
+        if(failedDatabaseQuery) {
+            this.validationErrors[(failedDatabaseQuery as any).column] = [
+                ERROR_CODES[(failedDatabaseQuery as any).code] || 'Invalid value'
+            ]
+        }
+
+    }
+}
+
+export class DataWrapperNotFound extends Error {
+    constructor(message: string) {
+        super(message);
     }
 }
