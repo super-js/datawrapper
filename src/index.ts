@@ -1,6 +1,8 @@
 import {ConnectionOptions} from "typeorm/connection/ConnectionOptions";
 
 import {createConnection, Connection, QueryRunner} from "typeorm";
+import {DataWrapperConnectionNotFound} from "./errors";
+import {DataWrapperTransaction} from "./transaction";
 
 export type DataWrapperConnectionOptions<E> = {
     entityNameSpacesToRegisters: (keyof E & string)[];
@@ -13,6 +15,7 @@ export interface IDataWrapperBuildOptions<E, C> {
 export interface IDataWrapperDatabaseConnections {
     [connectionName: string]: Connection;
 }
+
 
 export abstract class DataWrapper<E = any, C = IDataWrapperDatabaseConnections> {
 
@@ -69,14 +72,12 @@ export abstract class DataWrapper<E = any, C = IDataWrapperDatabaseConnections> 
             .map(entityName => this.entities[entityNamespace][entityName])
     }
 
-    async startTransaction(connectionName: string): Promise<any> {
-        const queryRunner  = await this.connections[connectionName].createQueryRunner();
-        await queryRunner.startTransaction();
+    async startTransaction(connectionName: string): Promise<DataWrapperTransaction> {
+        if(!this.connections.hasOwnProperty(connectionName))
+            throw new DataWrapperConnectionNotFound(`Connection ${connectionName} not found`);
 
-        return {
-            commit: queryRunner.commitTransaction,
-            rollback: queryRunner.rollbackTransaction
-        }
+        return DataWrapperTransaction.startTransaction(this.connections[connectionName])
+
     }
 
 }
@@ -85,6 +86,6 @@ export * from "typeorm";
 export * from "class-transformer";
 export * as Validator from "class-validator";
 
-export * from "./entity";
+export * from "./entities";
 export * from "./decorators";
 export * from "./errors";

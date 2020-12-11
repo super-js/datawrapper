@@ -1,26 +1,27 @@
 import {
     BaseEntity,
     CreateDateColumn,
-    PrimaryGeneratedColumn,
     UpdateDateColumn,
     DeleteDateColumn,
     Column,
-    BeforeInsert, BeforeUpdate, SaveOptions, QueryRunner
+    BeforeInsert, BeforeUpdate, SaveOptions, QueryRunner, InsertResult, ObjectType,
+    UpdateResult
 } from "typeorm";
 import {classToPlain, Expose} from "class-transformer";
-import { MaxLength, validateOrReject } from "class-validator";
-import { v4 as uuidv4 } from 'uuid';
-import {UniqueColumn} from "./decorators";
-import {DataWrapperValidationError} from "./errors";
-import {ObjectType} from "typeorm/common/ObjectType";
+import { validateOrReject } from "class-validator";
+import {DataWrapperValidationError} from "../errors";
+import {DataWrapperTransaction} from "../transaction";
+
 import {DeepPartial} from "typeorm/common/DeepPartial";
+import {QueryDeepPartialEntity} from "typeorm/query-builder/QueryPartialEntity";
+
 
 export interface IToJSONOptions {
     withDetails?: boolean;
 }
 
 export interface ISaveOptions extends Omit<SaveOptions, 'transaction'> {
-    transaction: QueryRunner;
+    transaction: DataWrapperTransaction;
 }
 
 export abstract class BaseDataWrapperEntity extends BaseEntity {
@@ -69,7 +70,38 @@ export abstract class BaseDataWrapperEntity extends BaseEntity {
         const {transaction, ..._saveOptions} = saveOptions || {};
 
         const newInstance = super.create(entity);
-        return transaction ? transaction.manager.save(newInstance) : newInstance.save(_saveOptions) as any;
+        return transaction && transaction.isTransactionActive ?
+            transaction.getQueryRunner().manager.save(newInstance) : newInstance.save(_saveOptions) as any;
+    }
+
+    static bulkCreateAndSave<T extends BaseDataWrapperEntity>(this: ObjectType<T>, entities: DeepPartial<T>[], saveOptions?: ISaveOptions): Promise<InsertResult> {
+
+        const {transaction, ..._saveOptions} = saveOptions || {};
+
+        const queryBuilder = super.createQueryBuilder();
+
+        if(transaction && transaction.isTransactionActive) queryBuilder.setQueryRunner(transaction.getQueryRunner());
+
+        const entitiesToCreateOrUpdate = entities.map(entity => super.create(entity as any)) as any;
+
+        return queryBuilder
+            .insert()
+            .into(this)
+            .values(entitiesToCreateOrUpdate)
+            .execute();
+    }
+
+    static bulkSoftDelete<T extends BaseDataWrapperEntity>(this: ObjectType<T>, whereEntities: Partial<T>[], saveOptions?: ISaveOptions): Promise<UpdateResult> {
+
+        const {transaction, ..._saveOptions} = saveOptions || {};
+
+        const queryBuilder = super.createQueryBuilder<T>();
+        if(transaction && transaction.isTransactionActive) queryBuilder.setQueryRunner(transaction.getQueryRunner());
+
+        return queryBuilder
+            .softDelete()
+            .where(whereEntities)
+            .execute()
     }
 
     async _runValidator() {
@@ -95,7 +127,6 @@ export abstract class BaseDataWrapperEntity extends BaseEntity {
         }
     }
 
-
     toJSON(options? : IToJSONOptions) {
 
         const {withDetails} = options || {};
@@ -105,35 +136,5 @@ export abstract class BaseDataWrapperEntity extends BaseEntity {
 
         return classToPlain(this, { groups });
     }
-
-}
-
-export abstract class DataWrapperEntity extends BaseDataWrapperEntity {
-
-    @PrimaryGeneratedColumn()
-    id: number;
-}
-
-export abstract class DataWrapperEntityWithCode extends DataWrapperEntity {
-
-    @UniqueColumn({
-        length: 36
-    })
-    code?: string;
-
-    @BeforeInsert()
-    _setCode() {
-        if(!this.code) this.code = uuidv4();
-    }
-
-}
-
-export abstract class DataWrapperEntityWithCodeNameDesc extends DataWrapperEntityWithCode {
-
-    @UniqueColumn()
-    name: string;
-
-    @Column({nullable: true})
-    description: string;
 
 }

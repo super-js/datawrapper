@@ -48,3 +48,9 @@ export class DataWrapperNotFound extends Error {
         super(message);
     }
 }
+
+export class DataWrapperConnectionNotFound extends Error {
+    constructor(message: string) {
+        super(message);
+    }
+}
