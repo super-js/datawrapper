@@ -89,3 +89,4 @@ export * as Validator from "class-validator";
 export * from "./entities";
 export * from "./decorators";
 export * from "./errors";
+export * from "./transaction";
