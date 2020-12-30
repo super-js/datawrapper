@@ -4,8 +4,8 @@ import {
     UpdateDateColumn,
     DeleteDateColumn,
     Column,
-    BeforeInsert, BeforeUpdate, SaveOptions, QueryRunner, InsertResult, ObjectType,
-    UpdateResult
+    BeforeInsert, BeforeUpdate, SaveOptions, InsertResult, ObjectType,
+    UpdateResult, QueryFailedError
 } from "typeorm";
 import {classToPlain, Expose} from "class-transformer";
 import { validateOrReject } from "class-validator";
@@ -22,6 +22,12 @@ export interface IToJSONOptions {
 
 export interface ISaveOptions extends Omit<SaveOptions, 'transaction'> {
     transaction: DataWrapperTransaction;
+    changedBy?: string;
+}
+
+export interface IUpdateOptions extends ISaveOptions {
+    primaryKeyNames?: string;
+    noReload?: boolean;
 }
 
 export abstract class BaseDataWrapperEntity extends BaseEntity {
@@ -66,12 +72,8 @@ export abstract class BaseDataWrapperEntity extends BaseEntity {
     }
 
     static createAndSave<T extends BaseDataWrapperEntity>(this: ObjectType<T>, entity: DeepPartial<T>, saveOptions?: ISaveOptions): Promise<T> {
-
-        const {transaction, ..._saveOptions} = saveOptions || {};
-
-        const newInstance = super.create(entity);
-        return transaction && transaction.isTransactionActive ?
-            transaction.getQueryRunner().manager.save(newInstance) : newInstance.save(_saveOptions) as any;
+        const newInstance = super.create(entity) as T;
+        return newInstance.saveEntity(saveOptions);
     }
 
     static bulkCreateAndSave<T extends BaseDataWrapperEntity>(this: ObjectType<T>, entities: DeepPartial<T>[], saveOptions?: ISaveOptions): Promise<InsertResult> {
@@ -93,6 +95,8 @@ export abstract class BaseDataWrapperEntity extends BaseEntity {
 
     static bulkSoftDelete<T extends BaseDataWrapperEntity>(this: ObjectType<T>, whereEntities: Partial<T>[], saveOptions?: ISaveOptions): Promise<UpdateResult> {
 
+        if(whereEntities.length === 0) return;
+        
         const {transaction, ..._saveOptions} = saveOptions || {};
 
         const queryBuilder = super.createQueryBuilder<T>();
@@ -101,6 +105,18 @@ export abstract class BaseDataWrapperEntity extends BaseEntity {
         return queryBuilder
             .softDelete()
             .where(whereEntities)
+            .execute()
+    }
+
+    static bulkUpdate<T extends BaseDataWrapperEntity>(this: ObjectType<T>, where: Partial<T>, partialEntity: QueryDeepPartialEntity<T>, saveOptions?: ISaveOptions): Promise<UpdateResult> {
+        const {transaction, ..._saveOptions} = saveOptions || {};
+
+        const queryBuilder = super.createQueryBuilder<T>();
+        if(transaction && transaction.isTransactionActive) queryBuilder.setQueryRunner(transaction.getQueryRunner());
+
+        return queryBuilder
+            .update(partialEntity)
+            .where(where)
             .execute()
     }
 
@@ -115,15 +131,64 @@ export abstract class BaseDataWrapperEntity extends BaseEntity {
         }
     }
 
-    async save(options?: SaveOptions) {
+    async update(updateObject: DeepPartial<this>, updateOptions?: IUpdateOptions): Promise<this> {
+        const {primaryKeyNames, noReload, changedBy, ..._saveOptions} = updateOptions || {} as any;
+
+        for(let p in updateObject) {
+            (this as any)[p] = updateObject[p];
+        }
+        this["changedBy"] = changedBy;
+
+        if(noReload) {
+            const queryBuilder = (this as any).constructor.createQueryBuilder();
+            if(_saveOptions.transaction && _saveOptions.transaction.isTransactionActive) {
+                queryBuilder.setQueryRunner(_saveOptions.transaction.getQueryRunner());
+            }
+
+            let where = {}
+            if(Array.isArray(primaryKeyNames) && primaryKeyNames.length > 0) {
+                primaryKeyNames
+                    .forEach(primaryKeyName => where[primaryKeyName] = this[primaryKeyName])
+            } else {
+                where["id"] = (this as any).id;
+            }
+
+            await queryBuilder
+                .update({
+                    ...updateObject,
+                    changedBy
+                })
+                .where(where)
+                .execute();
+        } else {
+            return this.saveEntity(_saveOptions)
+        }
+
+
+
+    }
+
+    async saveEntity(options?: ISaveOptions) {
         try {
-            await super.save(options);
+            const {transaction,changedBy, ...saveOptions} = options || {};
+
+            if(transaction && transaction.isTransactionActive) {
+                await transaction.getQueryRunner().manager.save(this, {...saveOptions});
+            } else {
+                await super.save({...saveOptions});
+            }
+
             return this;
         } catch(err) {
-            throw new DataWrapperValidationError({
-                entityName: this.constructor.name,
-                failedDatabaseQuery: err
-            })
+            if(err instanceof QueryFailedError) {
+                throw new DataWrapperValidationError({
+                    entityName: this.constructor.name,
+                    failedDatabaseQuery: err instanceof QueryFailedError ? err : null
+                })
+            }
+
+            throw err
+
         }
     }
 
@@ -134,7 +199,9 @@ export abstract class BaseDataWrapperEntity extends BaseEntity {
 
         if(withDetails) groups.push('withDetails')
 
-        return classToPlain(this, { groups });
+        return classToPlain(this, {
+            groups, excludePrefixes: ['_', '__']
+        });
     }
 
 }

@@ -6,6 +6,7 @@ export interface IDataWrapperValidationErrorConstructor {
     entityName: string;
     validationErrors?: ValidationError[];
     failedDatabaseQuery?: QueryFailedError;
+    unknownError?: Error;
 }
 
 export interface IDataWrapperValidationErrors {
@@ -39,6 +40,7 @@ export class DataWrapperValidationError extends Error {
                 ERROR_CODES[(failedDatabaseQuery as any).code] || 'Invalid value'
             ]
         }
+
 
     }
 }

@@ -1,10 +1,9 @@
-import {UniqueColumn} from "../decorators";
 import {Column} from "typeorm";
 import {DataWrapperEntityWithCode} from "./DataWrapperEntityWithCode";
 
 export abstract class DataWrapperEntityWithCodeNameDesc extends DataWrapperEntityWithCode {
 
-    @UniqueColumn()
+    @Column()
     name: string;
 
     @Column({nullable: true})
