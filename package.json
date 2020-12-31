@@ -28,7 +28,7 @@
     "typescript": "^4.0.5"
   },
   "scripts": {
-    "test": "yarn jest",
-    "build": "yarn rimraf lib/**/* && tsc -p tsconfig.json"
+    "build": "yarn run clean && npx tsc -p tsconfig.json",
+    "clean": "npx rimraf lib/**/*"
   }
 }
