@@ -5,7 +5,8 @@ import {
     DeleteDateColumn,
     Column,
     BeforeInsert, BeforeUpdate, SaveOptions, InsertResult, ObjectType,
-    UpdateResult, QueryFailedError
+    UpdateResult, QueryFailedError,
+    AfterLoad
 } from "typeorm";
 import {classToPlain, Expose} from "class-transformer";
 import { validateOrReject } from "class-validator";
@@ -28,6 +29,11 @@ export interface ISaveOptions extends Omit<SaveOptions, 'transaction'> {
 export interface IUpdateOptions extends ISaveOptions {
     primaryKeyNames?: string;
     noReload?: boolean;
+}
+
+export interface IToTreeOptions {
+    parentIdentifier?: string;
+    childrenIdentifier?: string;
 }
 
 export abstract class BaseDataWrapperEntity extends BaseEntity {
@@ -118,6 +124,35 @@ export abstract class BaseDataWrapperEntity extends BaseEntity {
             .update(partialEntity)
             .where(where)
             .execute()
+    }
+
+    static toTree<T extends BaseDataWrapperEntity>(this: ObjectType<T>, instances: T[], options : IToTreeOptions = {}) {
+        const {
+            childrenIdentifier = "children", parentIdentifier = "parentId"
+        } = options;
+
+        const mapChildrenForInstance = instance => {
+            if(!instance[childrenIdentifier] || !Array.isArray(instance[childrenIdentifier])) {
+                instance[childrenIdentifier] = [];
+            }
+
+            const hasChildren = instances
+                .some(potentialChild => potentialChild[parentIdentifier] === instance.id);
+
+            if(hasChildren) {
+                instance[childrenIdentifier].push(
+                    ...instances
+                        .filter(potentialChild => potentialChild[parentIdentifier] === instance.id)
+                        .map(child => mapChildrenForInstance(child))
+                )
+            }
+
+            return instance;
+        }
+
+        return instances
+            .filter(instance => !instance[parentIdentifier])
+            .map(instance => mapChildrenForInstance(instance))
     }
 
     async _runValidator() {

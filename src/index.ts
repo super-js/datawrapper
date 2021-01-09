@@ -37,7 +37,7 @@ export abstract class DataWrapper<E = any, C = IDataWrapperDatabaseConnections> 
 
     async addDatabaseConnection(connectionName: string, connectionOptions: DataWrapperConnectionOptions<E>) {
         const {
-            entityNameSpacesToRegisters = [], ...databaseConnectionOptions
+            entityNameSpacesToRegisters = [], logging, ...databaseConnectionOptions
         } = connectionOptions;
 
         this.connections[connectionName] = await createConnection({
