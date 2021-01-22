@@ -5,8 +5,7 @@ import {
     DeleteDateColumn,
     Column,
     BeforeInsert, BeforeUpdate, SaveOptions, InsertResult, ObjectType,
-    UpdateResult, QueryFailedError,
-    AfterLoad
+    UpdateResult, QueryFailedError
 } from "typeorm";
 import {classToPlain, Expose} from "class-transformer";
 import { validateOrReject } from "class-validator";
@@ -22,7 +21,7 @@ export interface IToJSONOptions {
 }
 
 export interface ISaveOptions extends Omit<SaveOptions, 'transaction'> {
-    transaction: DataWrapperTransaction;
+    transaction?: DataWrapperTransaction;
     changedBy?: string;
 }
 

@@ -1,3 +1,6 @@
+global.__DATE_FORMAT = process.env.DATE_FORMAT || ''
+global.__DATETIME_FORMAT = process.env.DATETIME_FORMAT || ''
+
 import {ConnectionOptions} from "typeorm/connection/ConnectionOptions";
 
 import {createConnection, Connection, QueryRunner} from "typeorm";
@@ -37,7 +40,7 @@ export abstract class DataWrapper<E = any, C = IDataWrapperDatabaseConnections> 
 
     async addDatabaseConnection(connectionName: string, connectionOptions: DataWrapperConnectionOptions<E>) {
         const {
-            entityNameSpacesToRegisters = [], logging, ...databaseConnectionOptions
+            entityNameSpacesToRegisters = [], ...databaseConnectionOptions
         } = connectionOptions;
 
         this.connections[connectionName] = await createConnection({
