@@ -5,7 +5,7 @@ import {
     DeleteDateColumn,
     Column,
     BeforeInsert, BeforeUpdate, SaveOptions, InsertResult, ObjectType,
-    UpdateResult, QueryFailedError
+    UpdateResult, QueryFailedError, Connection
 } from "typeorm";
 import {classToPlain, Expose} from "class-transformer";
 import { validateOrReject } from "class-validator";
@@ -14,6 +14,7 @@ import {DataWrapperTransaction} from "../transaction";
 
 import {DeepPartial} from "typeorm/common/DeepPartial";
 import {QueryDeepPartialEntity} from "typeorm/query-builder/QueryPartialEntity";
+import {TreeRepository} from "typeorm/repository/TreeRepository";
 
 
 export interface IToJSONOptions {
@@ -33,6 +34,10 @@ export interface IUpdateOptions extends ISaveOptions {
 export interface IToTreeOptions {
     parentIdentifier?: string;
     childrenIdentifier?: string;
+}
+
+export interface ITreeOptions {
+    transaction?: DataWrapperTransaction;
 }
 
 export abstract class BaseDataWrapperEntity extends BaseEntity {
@@ -74,6 +79,10 @@ export abstract class BaseDataWrapperEntity extends BaseEntity {
     @BeforeUpdate()
     _runValidatorBeforeUpdatet() {
         return this._runValidator();
+    }
+
+    static get currentConnection(): Connection {
+        return (this as any).usedConnection;
     }
 
     static createAndSave<T extends BaseDataWrapperEntity>(this: ObjectType<T>, entity: DeepPartial<T>, saveOptions?: ISaveOptions): Promise<T> {
@@ -152,6 +161,11 @@ export abstract class BaseDataWrapperEntity extends BaseEntity {
         return instances
             .filter(instance => !instance[parentIdentifier])
             .map(instance => mapChildrenForInstance(instance))
+    }
+
+    static asTree<T extends BaseDataWrapperEntity>(this: ObjectType<T>, options: ITreeOptions = {}): TreeRepository<T> {
+        const {transaction} = options;
+        return (this as any).currentConnection.getTreeRepository(this);
     }
 
     async _runValidator() {

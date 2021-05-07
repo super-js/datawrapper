@@ -1,8 +1,18 @@
 import {PrimaryGeneratedColumn} from "typeorm";
 import {BaseDataWrapperEntity} from "./BaseDataWrapperEntity";
-export abstract class DataWrapperEntity extends BaseDataWrapperEntity {
 
-    @PrimaryGeneratedColumn()
+import {DataWrapperFile} from "./DataWrapperFile";
+
+export abstract class DataWrapperEntity<FileEntity extends DataWrapperFile = DataWrapperFile> extends BaseDataWrapperEntity {
+    @PrimaryGeneratedColumn({})
     id: number;
 
+    private _files: FileEntity[] = [];
+
+    set files(files: FileEntity[]) {
+        this._files = files;
+    }
+    get files(): FileEntity[] {
+        return this._files || [];
+    }
 }

@@ -1,5 +1,6 @@
-import {Column} from "typeorm";
+import {Column, In} from "typeorm";
 import {DataWrapperEntityWithCode} from "./DataWrapperEntityWithCode";
+import {DataWrapperEntity} from "./DataWrapperEntity";
 
 export type DataWrapperFileStorageInfo = {
     bucketName: string;
@@ -16,7 +17,15 @@ export interface IDataWrapperFileBasicInfo {
     contentEncoding?: string
 }
 
-export abstract class DataWrapperFile extends DataWrapperEntityWithCode {
+export interface IDataWrapperFindFilesOptions {
+    entityInstanceId?: number;
+    entityInstanceIds?: number[];
+    entityInstanceCode?: string;
+    entityInstanceCodes?: string[];
+    withDetails?: boolean;
+}
+
+export abstract class DataWrapperFile<E = any> extends DataWrapperEntityWithCode {
 
     @Column()
     fileName: string;
@@ -42,6 +51,11 @@ export abstract class DataWrapperFile extends DataWrapperEntityWithCode {
     entityInstanceId: number;
 
     @Column()
+    entityInstanceCode?: string;
+
+    entityInstance?: E;
+
+    @Column()
     contentType: string;
 
     @Column()
@@ -65,6 +79,37 @@ export abstract class DataWrapperFile extends DataWrapperEntityWithCode {
             contentLength: this.contentLength,
             contentEncoding: this.contentEncoding
         }
+    }
+
+    static async findFilesFor<T extends DataWrapperFile>(entityTypeName: string, findFilesOptions: IDataWrapperFindFilesOptions): Promise<T[]> {
+        const { entityInstanceId, entityInstanceIds, entityInstanceCode, entityInstanceCodes, withDetails } = findFilesOptions as any;
+
+        let where = {};
+
+        if(Array.isArray(entityInstanceIds)) where['id'] = In(entityInstanceIds);
+        if(Array.isArray(entityInstanceCodes)) where['code'] = In(entityInstanceIds);
+
+        if(entityInstanceId) where['id'] = entityInstanceId;
+        if(entityInstanceCode) where['code'] = entityInstanceCode;
+
+        const files = await this.find({
+            select: withDetails ?
+                undefined : ['id', 'code', 'fileName', 'fileLabel', 'contentType', 'contentLength', 'contentEncoding'],
+            where,
+            order: {
+                createdAt: "ASC",
+                fileName: "ASC",
+            }
+        });
+
+        return files as T[];
+    }
+
+    static mapFilesToEntities<T extends DataWrapperFile, E extends DataWrapperEntity>(entityInstances: E[], files: T[]): E[] {
+        return entityInstances.map(entityInstance => {
+            entityInstance.files = files.filter(file => file.entityInstanceId === entityInstance.id);
+            return entityInstance;
+        });
     }
 
 }

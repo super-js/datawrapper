@@ -3,9 +3,10 @@ global.__DATETIME_FORMAT = process.env.DATETIME_FORMAT || ''
 
 import {ConnectionOptions} from "typeorm/connection/ConnectionOptions";
 
-import {createConnection, Connection, QueryRunner} from "typeorm";
+import {createConnection, Connection, QueryRunner, MoreThanOrEqual} from "typeorm";
 import {DataWrapperConnectionNotFound} from "./errors";
 import {DataWrapperTransaction} from "./transaction";
+import {DataWrapperMetaEntity} from "./entities";
 
 export type DataWrapperConnectionOptions<E> = {
     entityNameSpacesToRegisters: (keyof E & string)[];
@@ -38,7 +39,7 @@ export abstract class DataWrapper<E = any, C = IDataWrapperDatabaseConnections> 
         return self;
     }
 
-    async addDatabaseConnection(connectionName: string, connectionOptions: DataWrapperConnectionOptions<E>) {
+    async addDatabaseConnection(connectionName: string, connectionOptions: DataWrapperConnectionOptions<E>): Promise<void> {
         const {
             entityNameSpacesToRegisters = [], ...databaseConnectionOptions
         } = connectionOptions;
@@ -51,20 +52,34 @@ export abstract class DataWrapper<E = any, C = IDataWrapperDatabaseConnections> 
                 .flatMap(this.getEntitiesAsArray.bind(this)) as Function[]
         });
 
-        entityNameSpacesToRegisters
-            .forEach(entityNamespace =>
+        await Promise.all(entityNameSpacesToRegisters
+            .map(entityNamespace =>
                 this.setConnectionToEntityNamespace(entityNamespace, this.connections[connectionName])
-            )
+            ))
     }
 
-    setConnectionToEntityNamespace(entityNamespace: string, connection: Connection): void {
+    async setConnectionToEntityNamespace(entityNamespace: string, connection: Connection): Promise<void> {
         if(!this.entities.hasOwnProperty(entityNamespace)) return;
 
-        Object
+        await Promise.all(Object
             .keys(this.entities[entityNamespace])
-            .forEach(entityName => {
-                this.entities[entityNamespace][entityName].useConnection(connection)
+            .map(entityName => {
+                const Entity = this.entities[entityNamespace][entityName];
+                Entity.useConnection(connection);
+                return this.createMetaData(Entity);
+            }))
+    }
+
+    async createMetaData(Entity: typeof DataWrapperMetaEntity): Promise<void> {
+        if(Array.isArray(Entity.metaData) && Entity.metaData.length > 0) {
+            await Entity.delete({
+                id: MoreThanOrEqual(100000)
             });
+            await Entity.bulkCreateAndSave(Entity.metaData.map((metaRecord, ix) => ({
+                ...metaRecord, id: ix + 100000
+            })));
+
+        }
     }
 
     getEntitiesAsArray(entityNamespace: string): Function[] {
