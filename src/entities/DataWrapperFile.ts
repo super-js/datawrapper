@@ -50,7 +50,7 @@ export abstract class DataWrapperFile<E = any> extends DataWrapperEntityWithCode
     @Column()
     entityInstanceId: number;
 
-    @Column()
+    @Column({nullable: true})
     entityInstanceCode?: string;
 
     entityInstance?: E;
@@ -87,7 +87,7 @@ export abstract class DataWrapperFile<E = any> extends DataWrapperEntityWithCode
         let where = {};
 
         if(Array.isArray(entityInstanceIds)) where['id'] = In(entityInstanceIds);
-        if(Array.isArray(entityInstanceCodes)) where['code'] = In(entityInstanceIds);
+        if(Array.isArray(entityInstanceCodes)) where['code'] = In(entityInstanceCodes);
 
         if(entityInstanceId) where['id'] = entityInstanceId;
         if(entityInstanceCode) where['code'] = entityInstanceCode;
