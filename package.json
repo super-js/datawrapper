@@ -8,7 +8,7 @@
     "lib"
   ],
   "dependencies": {
-    "class-transformer": "^0.4.0",
+    "class-transformer": "0.4.0",
     "class-validator": "^0.13.1",
     "moment": "^2.29.1",
     "mysql2": "^2.2.5",
